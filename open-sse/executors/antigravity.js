@@ -19,7 +19,8 @@ const MAX_RETRY_AFTER_MS = 10000;
 const MAX_ANTIGRAVITY_OUTPUT_TOKENS = 16384;
 
 // Fields Google generateContent rejects (e.g. Claude adaptive output_config) — stripped from antigravity request envelope
-const ANTIGRAVITY_REQUEST_BLACKLIST = ["output_config"];
+// Claude/OpenAI-native thinking fields that Google generateContent rejects at the top-level body
+const ANTIGRAVITY_REQUEST_BLACKLIST = ["output_config", "thinking", "reasoning_effort", "reasoning", "enable_thinking", "thinking_budget"];
 
 export class AntigravityExecutor extends BaseExecutor {
   constructor() {
