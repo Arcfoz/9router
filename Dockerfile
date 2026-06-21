@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1.7
-ARG NODE_IMAGE=node:22-alpine
+# We changed this from alpine to bookworm-slim
+ARG NODE_IMAGE=node:22-bookworm-slim
 FROM ${NODE_IMAGE} AS base
 WORKDIR /app
 
 FROM base AS builder
 
-RUN apk --no-cache upgrade && apk --no-cache add python3 make g++ linux-headers
+# Replaced apk with Debian's apt-get
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
@@ -31,22 +33,20 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/custom-server.js ./custom-server.js
 COPY --from=builder /app/open-sse ./open-sse
-# Next file tracing can omit sibling files; MITM runs server.js as a separate process.
 COPY --from=builder /app/src/mitm ./src/mitm
-# Standalone node_modules may omit deps only required by the MITM child process.
 COPY --from=builder /app/node_modules/node-forge ./node_modules/node-forge
-# Ensure `next` is available at runtime in case tracing did not include it.
 COPY --from=builder /app/node_modules/next ./node_modules/next
 
 RUN mkdir -p /app/data && chown -R node:node /app && \
   mkdir -p /app/data-home && chown node:node /app/data-home && \
   ln -sf /app/data-home /root/.9router 2>/dev/null || true
 
-# Fix permissions at runtime (handles mounted volumes) AND install custom Python packages
-RUN apk --no-cache upgrade && apk --no-cache add su-exec python3 py3-pip && \
+# Install Python, gosu (for permissions), and the pre-built headroom-ai library
+RUN apt-get update && apt-get install -y python3 python3-pip gosu && \
+  rm -rf /var/lib/apt/lists/* && \
   ln -sf /usr/bin/python3 /usr/bin/python && \
   pip3 install "headroom-ai[proxy]" --break-system-packages && \
-  printf '#!/bin/sh\nchown -R node:node /app/data /app/data-home 2>/dev/null\nexec su-exec node "$@"\n' > /entrypoint.sh && \
+  printf '#!/bin/sh\nchown -R node:node /app/data /app/data-home 2>/dev/null\nexec gosu node "$@"\n' > /entrypoint.sh && \
   chmod +x /entrypoint.sh
 
 EXPOSE 20128
