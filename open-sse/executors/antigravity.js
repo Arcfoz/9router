@@ -104,6 +104,10 @@ export class AntigravityExecutor extends BaseExecutor {
       ...(tools?.length > 0 && { toolConfig: { functionCallingConfig: { mode: "VALIDATED" } } })
     };
 
+    // Strip blacklisted fields from BOTH body.request (already done) AND the top-level body
+    // (e.g. output_config set by thinkingUnified.js for claude-adaptive format sits at body root, not body.request)
+    for (const key of ANTIGRAVITY_REQUEST_BLACKLIST) delete body[key];
+
     this._lastSessionId = transformedRequest.sessionId; // cached for buildHeaders (base.execute order)
 
     return {
